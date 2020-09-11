@@ -7,9 +7,10 @@ import io.realm.annotations.PrimaryKey
 /**
  * Created by petrosmaliotis on 10/09/2020.
  */
-class Channel(
+open class Channel(
     @PrimaryKey
     var id: String? = null,
+    var name: String? = null,
     var users: RealmList<User> = RealmList(),
     var messages: RealmList<Message> = RealmList()
 ): RealmObject()

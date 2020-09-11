@@ -10,15 +10,13 @@ import java.util.*
 /**
  * Created by petrosmaliotis on 10/09/2020.
  */
-class RealmOperations {
+object RealmOperations {
 
-    companion object {
-        val realm: Realm by lazy {
-            Realm.getDefaultInstance()
-        }
+    private val realm: Realm by lazy {
+        Realm.getDefaultInstance()
     }
 
-    public fun createUser(username: String): String? {
+    public fun createUserIfNotExists(username: String): String? {
         var user = realm.where(User::class.java).equalTo("name", username).findFirst()
         if (user == null) {
             user = User()
@@ -27,26 +25,35 @@ class RealmOperations {
             realm.executeTransaction { r ->
                 r.copyToRealmOrUpdate(user)
             }
-
-            return user.id
-        } else {
-
-            return user.id
         }
+        return user.id
     }
 
-    public fun createChannel(vararg users: User): String? {
-        val channel = Channel()
-        channel.id = UUID.randomUUID().toString()
-        channel.users.addAll(users)
-        realm.executeTransaction { r ->
-            r.copyToRealmOrUpdate(channel)
-        }
-        // Reverse relationship
-        for (user in users) {
-            user.channels.add(channel)
+    public fun createChannelIfNotExists(channelName: String): String? {
+        var channel = realm.where(Channel::class.java).equalTo("name", channelName).findFirst()
+        if (channel == null) {
+            channel = Channel()
+            channel.id = UUID.randomUUID().toString()
+            channel.name = channelName
+            realm.executeTransaction { r ->
+                r.copyToRealmOrUpdate(channel)
+            }
         }
         return channel.id
+    }
+
+    public fun addUserToChannel(userId: String, channelId: String): Boolean {
+        var channel = realm.where(Channel::class.java).equalTo("id", channelId).findFirst()
+        var user = realm.where(User::class.java).equalTo("name", userId).findFirst()
+
+        if (user != null && channel != null) {
+            if (!user.channels.contains(channel)) {
+                user.channels.add(channel)
+                channel.users.add(user)
+            }
+        }
+
+        return true
     }
 
     public fun createContentWithText(text: String?): String? {
