@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools" >
+
+    <item
+        tools:width="100dp"
+        tools:height="50dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="15dp"/>
+            <solid android:color="@color/colorAccent"/>
+        </shape>
+    </item>
+
+    <item
+        android:width="@dimen/speech_bubble_corners_plus_tail"
+        android:height="@dimen/speech_bubble_corners_plus_tail"
+        android:gravity="bottom|left">
+        <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="@dimen/speech_bubble_corners_plus_tail"
+            android:height="@dimen/speech_bubble_corners_plus_tail"
+            android:viewportWidth="150.0"
+            android:viewportHeight="150.0">
+            <path
+                android:pathData="M150,100 L150,0 L50,0 C50,11.9054549 52.5180742,22.2130322 55.2200144,32.2289993 C59.25,47.1679688 65.7054859,60.8615415 68.15625,65.5820312 C55.2200144,107.207031 41.7460938,127.800781 0,151 C61.5311854,147.539062 101.691406,129.675781 124.615295,97.6602593 C132.823321,99.8389881 141.106342,100 150,100 Z"
+                android:fillColor="@color/colorAccent"/>
+        </vector>
+    </item>
+
+</layer-list>

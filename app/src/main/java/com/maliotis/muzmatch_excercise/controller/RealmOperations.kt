@@ -1,5 +1,6 @@
 package com.maliotis.muzmatch_excercise.controller
 
+import android.util.Log
 import com.maliotis.muzmatch_excercise.data.realmObjects.Channel
 import com.maliotis.muzmatch_excercise.data.realmObjects.Content
 import com.maliotis.muzmatch_excercise.data.realmObjects.Message
@@ -12,11 +13,10 @@ import java.util.*
  */
 object RealmOperations {
 
-    private val realm: Realm by lazy {
-        Realm.getDefaultInstance()
-    }
+    val TAG = RealmOperations::class.java.simpleName
 
     public fun createUserIfNotExists(username: String): String? {
+        val realm = Realm.getDefaultInstance()
         var user = realm.where(User::class.java).equalTo("name", username).findFirst()
         if (user == null) {
             user = User()
@@ -30,6 +30,7 @@ object RealmOperations {
     }
 
     public fun createChannelIfNotExists(channelName: String): String? {
+        val realm = Realm.getDefaultInstance()
         var channel = realm.where(Channel::class.java).equalTo("name", channelName).findFirst()
         if (channel == null) {
             channel = Channel()
@@ -43,20 +44,30 @@ object RealmOperations {
     }
 
     public fun addUserToChannel(userId: String, channelId: String): Boolean {
+        val realm = Realm.getDefaultInstance()
         var channel = realm.where(Channel::class.java).equalTo("id", channelId).findFirst()
-        var user = realm.where(User::class.java).equalTo("name", userId).findFirst()
+        var user = realm.where(User::class.java).equalTo("id", userId).findFirst()
 
-        if (user != null && channel != null) {
-            if (!user.channels.contains(channel)) {
-                user.channels.add(channel)
-                channel.users.add(user)
+        var succeeded = true
+
+        Log.d(TAG, "addUserToChannel: channel = $channel")
+        Log.d(TAG, "addUserToChannel: user = $user")
+        realm.executeTransaction {
+            if (user != null && channel != null) {
+                if (!user.channels.contains(channel)) {
+                    user.channels.add(channel)
+                    channel.users.add(user)
+                }
+            } else {
+                succeeded =  false
             }
-        }
 
-        return true
+        }
+        return succeeded
     }
 
     public fun createContentWithText(text: String?): String? {
+        val realm = Realm.getDefaultInstance()
         val content = Content()
         content.id = UUID.randomUUID().toString()
         content.text = text
@@ -67,6 +78,7 @@ object RealmOperations {
     }
 
     public fun createMessageToChannelWithUser(contentId: String, channelId: String, userId: String): String? {
+        val realm = Realm.getDefaultInstance()
         val content = realm.where(Content::class.java).equalTo("id", contentId).findFirst()
         val user = realm.where(User::class.java).equalTo("id", userId).findFirst()
         val channel = realm.where(Channel::class.java).equalTo("id", channelId).findFirst()
@@ -75,13 +87,57 @@ object RealmOperations {
         message.id = UUID.randomUUID().toString()
         message.content = content
         message.user = user
+        message.time = System.currentTimeMillis()
         message.channel = channel
+        message.alpha = 0f
+        message.tail = true
         realm.executeTransaction { r ->
             r.copyToRealmOrUpdate(message)
         }
+
         // Reverse relationships
-        user?.messages?.add(message)
-        channel?.messages?.add(message)
+        realm.executeTransaction {
+            user?.messages?.add(message)
+            channel?.messages?.add(message)
+        }
         return message.id
+    }
+
+    public fun getAllMessagesForChannelOnUI(channelId: String): MutableList<Message>? {
+        val uiRealm = Realm.getDefaultInstance()
+        val channel = uiRealm.where(Channel::class.java).equalTo("id", channelId).findFirst()
+        return channel?.messages?.toMutableList()
+    }
+
+    public fun getChannelOnUI(channelId: String): Channel? {
+        val uiRealm = Realm.getDefaultInstance()
+        return uiRealm.where(Channel::class.java).equalTo("id", channelId).findFirst()
+    }
+
+    public fun getMessageOnUI(messageId: String): Message? {
+        val uiRealm = Realm.getDefaultInstance()
+        return uiRealm.where(Message::class.java).equalTo("id", messageId).findFirst()
+    }
+
+    public fun changeAlphaOnMessageOnUI(messageId: String, alphaValue: Float) {
+        val uiRealm = Realm.getDefaultInstance()
+        val message = uiRealm.where(Message::class.java).equalTo("id", messageId).findFirst()
+        uiRealm.executeTransaction {
+            message?.alpha = alphaValue
+        }
+    }
+
+    public fun changeTailOnMessageOnUI(messageId: String, hasTail: Boolean) {
+        val uiRealm = Realm.getDefaultInstance()
+        val message = uiRealm.where(Message::class.java).equalTo("id", messageId).findFirst()
+        uiRealm.executeTransaction {
+            message?.tail = hasTail
+        }
+    }
+
+    fun getUserOnUI(userId: String): User? {
+        val uiRealm = Realm.getDefaultInstance()
+        return uiRealm.where(User::class.java).equalTo("id", userId).findFirst()
+
     }
 }

@@ -2,6 +2,7 @@ package com.maliotis.muzmatch_excercise
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import com.maliotis.muzmatch_excercise.controller.Operations
 import com.maliotis.muzmatch_excercise.fragments.ChatFragment
 import io.reactivex.Observable
@@ -14,12 +15,15 @@ import io.reactivex.subjects.PublishSubject
 
 class MainActivity : AppCompatActivity() {
 
+    val TAG = MainActivity::class.java.simpleName
+
     // Realm Ids
-    lateinit var loggedInUserId: String
-    lateinit var channelId: String
+    var loggedInUserId: String? = null
+    var channelId: String? = null
     var bobIdSubject = PublishSubject.create<String>()
     var aliceIdSubject = PublishSubject.create<String>()
     var channelIdSubject = PublishSubject.create<String>()
+    var usersChannelZipObservable: Observable<MutableList<String>>? = null
 
     // Usernames
     var bob = "Bob"
@@ -37,19 +41,26 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        channelIdSubject = PublishSubject.create<String>()
+        aliceIdSubject = PublishSubject.create<String>()
+        bobIdSubject = PublishSubject.create<String>()
+
         addUsersToChannelObserver()
 
+        // Setting default user - Bob
         val disposableDefaultUser = Operations.createUser(defaultUser) { userId ->
+            Log.d(TAG, "onCreate: Bob's id = $userId")
             loggedInUserId = userId
             bobIdSubject.onNext(userId)
         }
 
+        // Creating Alice if doesn't exist
         val disposableAlice = Operations.createUser(alice) { userId ->
-            print("Alice's id = $userId")
+            Log.d(TAG, "onCreate: Alice's id = $userId")
             aliceIdSubject.onNext(userId)
         }
 
-
+        // Setting the channel for communication
         val disposableChannel = Operations.setChannel(defaultChannelName) { cid ->
             channelId = cid
             channelIdSubject.onNext(cid)
@@ -59,6 +70,7 @@ class MainActivity : AppCompatActivity() {
         disposables.add(disposableAlice)
         disposables.add(disposableChannel)
 
+        // Init Chat fragment
         val chatFragment = ChatFragment()
         chatFragment.mainActivity = this
         supportFragmentManager.beginTransaction()
@@ -66,23 +78,32 @@ class MainActivity : AppCompatActivity() {
             .commit()
     }
 
+    /**
+     * Observer for users (Bob, Alice) and channel
+     * Once created/fetched proceed by adding them to the channel if they are not included.
+     */
     private fun addUsersToChannelObserver() {
-        val disposable = Observables.zip(bobIdSubject, aliceIdSubject, channelIdSubject) { bobId, aliceId, channelId ->
+        usersChannelZipObservable = Observables.zip(bobIdSubject, aliceIdSubject, channelIdSubject) { bobId, aliceId, channelId ->
             mutableListOf(bobId, aliceId, channelId)
         }
+        val disposable = (usersChannelZipObservable as Observable<MutableList<String>>)
             .observeOn(Schedulers.io())
             .flatMap { usersChannelId ->
                 Observable.create<MutableList<String>> { emitter ->
                     // Add Bob to channel
                     val bobId = usersChannelId.first()
-                    val aliceId = usersChannelId[1]
+                    Log.d(TAG, "addUsersToChannelObserver: bobId = $bobId")
                     val channelId = usersChannelId[2]
                     Operations.addUserToChannel(bobId, channelId) { succeeded ->
                         if (succeeded) {
-                            print("Bob added to channel withId = $channelId")
+                            Log.d(TAG, "addUsersToChannelObserver: Bob added to channel withId = $channelId")
                             emitter.onNext(usersChannelId)
+                        } else {
+                            Log.d(TAG, "addUsersToChannelObserver: Bob wasn't added")
                         }
+
                     }
+
                 }
             }
             .flatMap { usersChannelId ->
@@ -92,8 +113,10 @@ class MainActivity : AppCompatActivity() {
                     val channelId = usersChannelId[2]
                     Operations.addUserToChannel(aliceId, channelId) { succeeded ->
                         if (succeeded) {
-                            print("Alice added to channel withId = $channelId")
+                            Log.d(TAG, "addUsersToChannelObserver: Alice added to channel withId = $channelId")
                             emitter.onNext(succeeded)
+                        } else {
+                            Log.d(TAG, "addUsersToChannelObserver: Alice wasn't added")
                         }
                     }
 
@@ -101,7 +124,8 @@ class MainActivity : AppCompatActivity() {
             }
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe { succeeded ->
-                print("All users have been added to channel")
+                if (succeeded)
+                    print("All users have been added to channel")
             }
         disposables.add(disposable)
     }

@@ -13,6 +13,8 @@ open class Message(
     var time: Long? = null,
     var user: User? = null,
     var content: Content? = null,
-    var channel: Channel? = null
+    var channel: Channel? = null,
+    var alpha: Float? = null,
+    var tail: Boolean? = null
 ): RealmObject()
 

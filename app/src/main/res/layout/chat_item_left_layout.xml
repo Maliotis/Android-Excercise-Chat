@@ -4,14 +4,31 @@
     android:layout_height="wrap_content"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <ImageView
+        android:id="@+id/chatPersonImage"
+        android:layout_width="30dp"
+        android:layout_marginStart="12dp"
+        android:layout_height="30dp"
+        android:layout_centerVertical="true"
+        android:layout_alignParentStart="true"
+        android:src="@drawable/ic_person_24px"
+        android:padding="4dp"
+        android:background="@drawable/text_entry_sticker_bg"
+        />
+
     <TextView
-        android:layout_alignParentEnd="true"
-        tools:text="Hi "
-        android:background="@drawable/bubble_with_tail"
+        android:id="@+id/leftTextView"
+
+        android:layout_toEndOf="@id/chatPersonImage"
+        tools:text="Hi"
+        android:background="@drawable/bubble_with_tail_left"
         android:textAlignment="center"
         android:gravity="center"
         android:padding="8dp"
-        android:layout_margin="20dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="14dp"
         android:textColor="@android:color/black"
         android:textSize="14sp"
         android:layout_width="wrap_content"

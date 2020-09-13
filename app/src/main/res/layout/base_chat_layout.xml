@@ -16,7 +16,7 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <Button
-            android:id="@+id/aliceUser"
+            android:id="@+id/aliceUseButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
@@ -26,7 +26,7 @@
             android:textColor="@android:color/white" />
 
         <Button
-            android:id="@+id/bobUser"
+            android:id="@+id/bobUserButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
@@ -75,6 +75,7 @@
             android:layout_toRightOf="@id/textEntryStickerButton"
             android:layout_width="match_parent"
             android:layout_height="40dp"
+            android:paddingEnd="45dp"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="12dp"
             android:background="@drawable/text_entry_edit_text_bg"
