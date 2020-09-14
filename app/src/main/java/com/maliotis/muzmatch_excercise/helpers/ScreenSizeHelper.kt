@@ -38,4 +38,23 @@ object ScreenSizeHelper {
         }
         return result
     }
+
+    fun getUsableToRealScreenDifferenceOnYAxis(context: Context): Int {
+        return getNavBarHeight(context) + getStatusBarHeight(context) + fromDPToPixel(6f, context)
+    }
+
+    /**
+     * return the middle point(middleX, middleY) of a line with point0(x0, y0) and point1(x1, y1)
+     */
+    fun findPointInLine(x0: Float, y0: Float, x1: Float, y1: Float, divider: Float): IntArray {
+        val returnArray = IntArray(2)
+
+        val middleX = (x0 + x1) / divider
+        val middleY = (y0 + y1) / divider
+
+        returnArray[0] = middleX.toInt()
+        returnArray[1] = middleY.toInt()
+
+        return returnArray
+    }
 }

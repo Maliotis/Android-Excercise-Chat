@@ -12,7 +12,12 @@ object DateHelper {
 
     val TAG = DateHelper::class.java.simpleName
 
-    public fun getStringFormattedDate(time: Long?): String {
+    /**
+     * @param time - Unix Timestamp
+     * @return The date in a human readable format
+     * i.e Saturday November 2012 10:45
+     */
+    fun getStringFormattedDate(time: Long?): String {
         if (time != null) {
             val date = Date(time)
             // i.e Saturday November 2012 10:45
@@ -23,7 +28,7 @@ object DateHelper {
         return "Time was null :("
     }
 
-    public fun getTimeDifferenceInHours(startTime: Long?, endTime: Long?): Long {
+    fun getTimeDifferenceInHours(startTime: Long?, endTime: Long?): Long {
         var timeDiff = 0L
         if (startTime != null && endTime != null) {
             //  /1000 to get from millis to sec
@@ -34,7 +39,7 @@ object DateHelper {
         return timeDiff
     }
 
-    public fun getTimeDifferenceInSeconds(startTime: Long?, endTime: Long?): Long {
+    fun getTimeDifferenceInSeconds(startTime: Long?, endTime: Long?): Long {
         var timeDiff = 0L
         if (startTime != null && endTime != null) {
             timeDiff = (endTime - startTime) / 1000

@@ -15,7 +15,7 @@ object RealmOperations {
 
     val TAG = RealmOperations::class.java.simpleName
 
-    public fun createUserIfNotExists(username: String): String? {
+    fun createUserIfNotExists(username: String): String? {
         val realm = Realm.getDefaultInstance()
         var user = realm.where(User::class.java).equalTo("name", username).findFirst()
         if (user == null) {
@@ -29,7 +29,7 @@ object RealmOperations {
         return user.id
     }
 
-    public fun createChannelIfNotExists(channelName: String): String? {
+    fun createChannelIfNotExists(channelName: String): String? {
         val realm = Realm.getDefaultInstance()
         var channel = realm.where(Channel::class.java).equalTo("name", channelName).findFirst()
         if (channel == null) {
@@ -43,10 +43,10 @@ object RealmOperations {
         return channel.id
     }
 
-    public fun addUserToChannel(userId: String, channelId: String): Boolean {
+    fun addUserToChannel(userId: String, channelId: String): Boolean {
         val realm = Realm.getDefaultInstance()
-        var channel = realm.where(Channel::class.java).equalTo("id", channelId).findFirst()
-        var user = realm.where(User::class.java).equalTo("id", userId).findFirst()
+        val channel = realm.where(Channel::class.java).equalTo("id", channelId).findFirst()
+        val user = realm.where(User::class.java).equalTo("id", userId).findFirst()
 
         var succeeded = true
 
@@ -66,7 +66,7 @@ object RealmOperations {
         return succeeded
     }
 
-    public fun createContentWithText(text: String?): String? {
+    fun createContentWithText(text: String?): String? {
         val realm = Realm.getDefaultInstance()
         val content = Content()
         content.id = UUID.randomUUID().toString()
@@ -77,7 +77,7 @@ object RealmOperations {
         return content.id
     }
 
-    public fun createMessageToChannelWithUser(contentId: String, channelId: String, userId: String): String? {
+    fun createMessageToChannelWithUser(contentId: String, channelId: String, userId: String): String? {
         val realm = Realm.getDefaultInstance()
         val content = realm.where(Content::class.java).equalTo("id", contentId).findFirst()
         val user = realm.where(User::class.java).equalTo("id", userId).findFirst()
@@ -103,23 +103,25 @@ object RealmOperations {
         return message.id
     }
 
-    public fun getAllMessagesForChannelOnUI(channelId: String): MutableList<Message>? {
+    // UI Realm operations
+
+    fun getAllMessagesForChannel(channelId: String): MutableList<Message>? {
         val uiRealm = Realm.getDefaultInstance()
         val channel = uiRealm.where(Channel::class.java).equalTo("id", channelId).findFirst()
         return channel?.messages?.toMutableList()
     }
 
-    public fun getChannelOnUI(channelId: String): Channel? {
+    fun getChannel(channelId: String): Channel? {
         val uiRealm = Realm.getDefaultInstance()
         return uiRealm.where(Channel::class.java).equalTo("id", channelId).findFirst()
     }
 
-    public fun getMessageOnUI(messageId: String): Message? {
+    fun getMessage(messageId: String): Message? {
         val uiRealm = Realm.getDefaultInstance()
         return uiRealm.where(Message::class.java).equalTo("id", messageId).findFirst()
     }
 
-    public fun changeAlphaOnMessageOnUI(messageId: String, alphaValue: Float) {
+    fun changeAlphaOnMessage(messageId: String, alphaValue: Float) {
         val uiRealm = Realm.getDefaultInstance()
         val message = uiRealm.where(Message::class.java).equalTo("id", messageId).findFirst()
         uiRealm.executeTransaction {
@@ -127,7 +129,7 @@ object RealmOperations {
         }
     }
 
-    public fun changeTailOnMessageOnUI(messageId: String, hasTail: Boolean) {
+    fun changeTailOnMessage(messageId: String, hasTail: Boolean) {
         val uiRealm = Realm.getDefaultInstance()
         val message = uiRealm.where(Message::class.java).equalTo("id", messageId).findFirst()
         uiRealm.executeTransaction {
@@ -135,7 +137,7 @@ object RealmOperations {
         }
     }
 
-    fun getUserOnUI(userId: String): User? {
+    fun getUser(userId: String): User? {
         val uiRealm = Realm.getDefaultInstance()
         return uiRealm.where(User::class.java).equalTo("id", userId).findFirst()
 

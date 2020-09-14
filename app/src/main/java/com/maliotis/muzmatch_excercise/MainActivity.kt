@@ -6,7 +6,6 @@ import android.util.Log
 import com.maliotis.muzmatch_excercise.controller.Operations
 import com.maliotis.muzmatch_excercise.fragments.ChatFragment
 import io.reactivex.Observable
-import io.reactivex.Scheduler
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.rxkotlin.Observables
@@ -61,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Setting the channel for communication
-        val disposableChannel = Operations.setChannel(defaultChannelName) { cid ->
+        val disposableChannel = Operations.createChannel(defaultChannelName) { cid ->
             channelId = cid
             channelIdSubject.onNext(cid)
         }

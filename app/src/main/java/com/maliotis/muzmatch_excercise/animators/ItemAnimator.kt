@@ -18,29 +18,25 @@ import org.w3c.dom.Text
 /**
  * Created by petrosmaliotis on 12/09/2020.
  */
-class ItemAnimator(context: Context,val onAnimationStart: (IntArray) -> Unit) : SimpleItemAnimator() {
+class ItemAnimator(var context: Context, val onAnimationStart: (IntArray) -> Unit) : SimpleItemAnimator() {
 
-    val TAG = ItemAnimator::class.java.simpleName
-
-    var context: Context
     var triggerCallback = false
 
     override fun animateRemove(holder: ViewHolder?): Boolean {
         return false
     }
 
+    /**
+     * Trick to wait for recyclerView to add in the newly inserted item and
+     * the correct location on screen
+     */
     override fun animateAdd(holder: ViewHolder): Boolean {
 
         val view = holder.itemView
         val animation = ValueAnimator.ofFloat(-1f, 0f).apply {
 
             addListener(object: Animator.AnimatorListener {
-                override fun onAnimationRepeat(animation: Animator?) {
-                    //TODO("Not yet implemented")
-                }
-
                 override fun onAnimationEnd(animation: Animator?) {
-                    //TODO("Not yet implemented")
                     if (triggerCallback) {
                         triggerCallback = false
                         val intArray = IntArray(2)
@@ -48,14 +44,9 @@ class ItemAnimator(context: Context,val onAnimationStart: (IntArray) -> Unit) : 
                         this@ItemAnimator.onAnimationStart(intArray)
                     }
                 }
-
-                override fun onAnimationCancel(animation: Animator?) {
-                    //TODO("Not yet implemented")
-                }
-
-                override fun onAnimationStart(animation: Animator?) {
-
-                }
+                override fun onAnimationRepeat(animation: Animator?) {}
+                override fun onAnimationCancel(animation: Animator?) {}
+                override fun onAnimationStart(animation: Animator?) {}
             })
 
             addUpdateListener { animation: ValueAnimator ->
@@ -96,8 +87,4 @@ class ItemAnimator(context: Context,val onAnimationStart: (IntArray) -> Unit) : 
     }
 
 
-
-    init {
-        this.context = context
-    }
 }

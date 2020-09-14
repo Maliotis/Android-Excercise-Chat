@@ -4,13 +4,12 @@ import android.animation.*
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Path
-import android.graphics.Point
 import android.graphics.PorterDuff
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.VectorDrawable
-import android.os.Build
 import android.os.Bundle
+import android.text.InputType
 import android.util.DisplayMetrics
 import android.util.Log
 import android.util.TypedValue
@@ -31,15 +30,11 @@ import com.maliotis.muzmatch_excercise.MainActivity
 import com.maliotis.muzmatch_excercise.R
 import com.maliotis.muzmatch_excercise.adapters.MessageListAdapter
 import com.maliotis.muzmatch_excercise.animators.ItemAnimator
-import com.maliotis.muzmatch_excercise.controller.Conversation
-import com.maliotis.muzmatch_excercise.controller.Login
 import com.maliotis.muzmatch_excercise.controller.Operations
-import com.maliotis.muzmatch_excercise.controller.RealmOperations
 import com.maliotis.muzmatch_excercise.data.realmObjects.Channel
 import com.maliotis.muzmatch_excercise.data.realmObjects.Message
 import com.maliotis.muzmatch_excercise.data.realmObjects.User
 import com.maliotis.muzmatch_excercise.helpers.DateHelper
-import com.maliotis.muzmatch_excercise.helpers.GeoHelper
 import com.maliotis.muzmatch_excercise.helpers.ScreenSizeHelper
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -73,8 +68,8 @@ class ChatFragment: Fragment() {
         val layoutView = recyclerView.layoutManager?.findViewByPosition(dataForAdapter.size - 1) as? RelativeLayout
         val rightTextView = layoutView?.findViewById<TextView>(R.id.rightTextView)
         layoutView!!.getLocationInWindow(intArray)
-        // Use relatives layout y // and readjust from true screen size to usable screen size on axis y
-        intArray[1] = intArray[1] - (ScreenSizeHelper.getNavBarHeight(mainActivity) + ScreenSizeHelper.getStatusBarHeight(mainActivity) + ScreenSizeHelper.fromDPToPixel(6f, mainActivity))//156
+        // Use relatives layout y - and readjust from true screen size to usable screen size on axis y
+        intArray[1] = intArray[1] - ScreenSizeHelper.getUsableToRealScreenDifferenceOnYAxis(mainActivity)
 
         val rightTextViewArray = IntArray(2)
         rightTextView!!.getLocationInWindow(rightTextViewArray)
@@ -139,6 +134,8 @@ class ChatFragment: Fragment() {
         bobButtonObservable = createBobButtonObservable()
         stickerButtonObservable = createStickerButtonObservable()
 
+        textEntryEditText.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+
         return baseChat
     }
 
@@ -160,7 +157,6 @@ class ChatFragment: Fragment() {
                 if (textEntryEditText.text.toString() != "") {
                     val text = textEntryEditText.text.toString()
                     sendButton.isEnabled = false
-                    Log.d(TAG, "createSendButtonObservable: sendButton sending text over")
                     emitter.onNext(text)
                 }
 
@@ -172,6 +168,10 @@ class ChatFragment: Fragment() {
         }
     }
 
+    /**
+     * Create the [aliceButton] observable listener and
+     * changes the loggedInUser
+     */
     private fun createAliceButtonObservable(): Observable<String> {
         return Observable.create<String> { emitter ->
             aliceButton.setOnClickListener {
@@ -185,6 +185,10 @@ class ChatFragment: Fragment() {
         }
     }
 
+    /**
+     * Create the [bobButton] observable listener and
+     * changes the loggedInUser
+     */
     private fun createBobButtonObservable(): Observable<String> {
         return Observable.create<String> { emitter ->
             bobButton.setOnClickListener {
@@ -218,9 +222,10 @@ class ChatFragment: Fragment() {
      */
     private fun populateData(channelId: String) {
         // Get all messages in UI view to access fields
-        val allMessages = RealmOperations.getAllMessagesForChannelOnUI(channelId)
+
+        val allMessages = Operations.getAllMessagesForChannelOnCurrentThread(channelId)
         // Get channel
-        channel = RealmOperations.getChannelOnUI(channelId)
+        channel = Operations.getChannelOnCurrentThread(channelId)
         allMessages?.forEachIndexed { i, msg ->
             if (i == 0) {
                 // Display Divider for first message
@@ -232,7 +237,7 @@ class ChatFragment: Fragment() {
                 // check previous message if there is more than one hour difference
                 val prevMsg = allMessages[i-1]
                 val timeDiff = DateHelper.getTimeDifferenceInHours(prevMsg.time, msg.time)
-                if (timeDiff > 1) {
+                if (timeDiff >= 1) {
                     val stringDate = DateHelper.getStringFormattedDate(msg.time)
                     dataForAdapter.add(stringDate)
                     dataForAdapter.add(msg)
@@ -274,6 +279,14 @@ class ChatFragment: Fragment() {
         simpleItemAnimator.triggerCallback = true
     }
 
+    /**
+     * A message has a tail when any of the following 3 criteria are met:
+     * It is the most recent message in the conversation
+     * The message after it is sent by the other user
+     * The message after it was sent more than 20 seconds afterwards
+     *
+     * If none of these criteria are met we remove the bubble
+     */
     private fun checkPreviousMessageForBubbleTail(last: Message, message: Message) {
         val timeDiff = DateHelper.getTimeDifferenceInSeconds(last.time, message.time)
         if (last.user?.name == message.user?.name && timeDiff < 20) {
@@ -289,13 +302,12 @@ class ChatFragment: Fragment() {
                 animator.duration = 300
                 animator.addUpdateListener {
                     val value = it.animatedValue as Int
-                    Log.d(TAG, "checkPreviousMessageForBubbleTail: animatedValue = $value")
-                    val params = (rightTextView?.layoutParams as RelativeLayout.LayoutParams)
+                    val params = (rightTextView.layoutParams as RelativeLayout.LayoutParams)
                     params.bottomMargin = value
-                    rightTextView?.layoutParams = params
+                    rightTextView.layoutParams = params
                 }
                 animator.start()
-                RealmOperations.changeTailOnMessageOnUI(last.id!!, false)
+                Operations.changeTailOnMessageOnCurrentThread(last.id!!, false)
             }
         }
     }
@@ -319,28 +331,29 @@ class ChatFragment: Fragment() {
 
         initSmoothScroller()
 
+        // Send Button subscriber
         val disposable = sendButtonObservable.subscribeOn(AndroidSchedulers.mainThread())
             .observeOn(Schedulers.io())
             .flatMap { text ->
                 Observable.create<String> { emitter ->
-                    val messageId = Conversation.sendMessageFrom(text, mainActivity.loggedInUserId!!, mainActivity.channelId!!)
+                    val messageId = Operations.sendMessageFrom(text, mainActivity.loggedInUserId!!, mainActivity.channelId!!)
                     emitter.onNext(messageId ?: "")
                 }
             }
             .observeOn(AndroidSchedulers.mainThread())
             .subscribe { messageId ->
                 if (messageId.isNotEmpty()) {
-                    Log.d(TAG, "onStart: Send message succeeded")
-                    val message = RealmOperations.getMessageOnUI(messageId)
+                    val message = Operations.getMessageOnCurrentThread(messageId)
                     addRecentMessage(message)
                 }
             }
 
+        // Alice Button subscriber
         val aliceDisposable = aliceButtonObservable.subscribeOn(AndroidSchedulers.mainThread())
             .observeOn(Schedulers.io())
             .flatMap { text ->
                 Observable.create<String> { emitter ->
-                    Login.withUser(text) { loggedInUserId ->
+                    Operations.loginWithUser(text) { loggedInUserId ->
                         mainActivity.loggedInUserId = loggedInUserId
                         emitter.onNext(loggedInUserId)
                     }
@@ -349,12 +362,12 @@ class ChatFragment: Fragment() {
             .observeOn(AndroidSchedulers.mainThread())
             .flatMap { userId ->
                 Observable.create<User> { emitter ->
-                    val user = RealmOperations.getUserOnUI(userId)
+                    val user = Operations.getUserOnCurrentThread(userId)
                     emitter.onNext(user!!)
                 }
             }
             .subscribe { loggedInUser ->
-                Log.d(TAG, "onStart: loggedInUser.channels.size = ${loggedInUser.channels.size}")
+                dataForAdapter.clear()
                 populateData(loggedInUser.channels.first()?.id!!)
                 messageListAdapter = MessageListAdapter(dataForAdapter, loggedInUser.id!!, mainActivity)
                 recyclerView.adapter = messageListAdapter
@@ -362,11 +375,12 @@ class ChatFragment: Fragment() {
 
             }
 
+        // Bob button subscriber
         val bobDisposable = bobButtonObservable.subscribeOn(AndroidSchedulers.mainThread())
             .observeOn(Schedulers.io())
             .flatMap { text ->
                 Observable.create<String> { emitter ->
-                    Login.withUser(text) { loggedInUserId ->
+                    Operations.loginWithUser(text) { loggedInUserId ->
                         mainActivity.loggedInUserId = loggedInUserId
                         emitter.onNext(loggedInUserId)
                     }
@@ -375,12 +389,12 @@ class ChatFragment: Fragment() {
             .observeOn(AndroidSchedulers.mainThread())
             .flatMap { userId ->
                 Observable.create<User> { emitter ->
-                    val user = RealmOperations.getUserOnUI(userId)
+                    val user = Operations.getUserOnCurrentThread(userId)
                     emitter.onNext(user!!)
                 }
             }
             .subscribe { loggedInUser ->
-                Log.d(TAG, "onStart: loggedInUser.channels.size = ${loggedInUser.channels.size}")
+                dataForAdapter.clear()
                 populateData(loggedInUser.channels.first()?.id!!)
                 messageListAdapter = MessageListAdapter(dataForAdapter, loggedInUser.id!!, mainActivity)
                 recyclerView.adapter = messageListAdapter
@@ -388,6 +402,7 @@ class ChatFragment: Fragment() {
 
             }
 
+        // When all users and channel have been initialized/fetched populate the recycler view
         val zipDisposable = mainActivity.usersChannelZipObservable!!.subscribe {
             val channelId = it.last()
             val bobsId = it.first()
@@ -397,12 +412,16 @@ class ChatFragment: Fragment() {
             recyclerView.scrollToPosition(dataForAdapter.size - 1)
         }
 
+        // Add disposables to dispose later
         disposables.add(disposable)
         disposables.add(aliceDisposable)
         disposables.add(bobDisposable)
         disposables.add(zipDisposable)
     }
 
+    /**
+     * Creates the text view that will animate into the recycler view with an arc motion
+     */
     private fun createTextViewToAnimate(endCoordIntArray: IntArray) {
         val coordArray = IntArray(2)
 
@@ -419,26 +438,83 @@ class ChatFragment: Fragment() {
             gravity = Gravity.CENTER
 
             // Set coordinates
-
-            textEntryEditText.getLocationInWindow(coordArray)
-            //coordArray[0] = coordArray[0] - (ScreenSizeHelper.getNavBarHeight(mainActivity) + ScreenSizeHelper.getStatusBarHeight(mainActivity) + ScreenSizeHelper.fromDPToPixel(6f, mainActivity))//156
-            coordArray[1] = coordArray[1] - (ScreenSizeHelper.getNavBarHeight(mainActivity) + ScreenSizeHelper.getStatusBarHeight(mainActivity) + ScreenSizeHelper.fromDPToPixel(6f, mainActivity))//156
+            textEntryEditText.getLocationInWindow(coordArray) // getLocationOnWindow return x,y on the real screen size
+            coordArray[1] = coordArray[1] - ScreenSizeHelper.getUsableToRealScreenDifferenceOnYAxis(mainActivity)
             x = coordArray[0].toFloat()
             y = coordArray[1].toFloat()
 
-            Log.d(TAG, "createTextViewToAnimate: textEntryEditText.x = ${coordArray[0]} textEntryEditText.y ${coordArray[1]}")
-
             // Add background
-            val sDrawable = ResourcesCompat.getDrawable(resources, R.drawable.bubble_with_tail_right_white, null) as LayerDrawable
-            Log.d(TAG, "createTextViewToAnimate: sDrawable.class = ${sDrawable!!::class.java}")
-            background = sDrawable
+            val layerDrawable = ResourcesCompat.getDrawable(resources, R.drawable.bubble_with_tail_right_white, null) as LayerDrawable
+            background = layerDrawable
         }
         baseChat.addView(textViewToAnimate)
         textViewToAnimate.bringToFront()
         ViewCompat.setTranslationZ(textViewToAnimate, 1f)
         textViewToAnimate.requestFocus()
 
-        val path = Path().apply{
+        val path = getPathWithArc(endCoordIntArray, coordArray)
+
+        // Path Animator
+        val pathAnimator = ObjectAnimator.ofFloat(textViewToAnimate, View.X, View.Y, path)
+
+        val params = textViewToAnimate.layoutParams
+        val rightTextView = (recyclerView.layoutManager?.findViewByPosition(dataForAdapter.size - 1) as RelativeLayout).findViewById<TextView>(R.id.rightTextView)
+
+        // Width Animator
+        val widthAnimator = ValueAnimator.ofInt(textEntryEditText.width, rightTextView!!.width)
+        widthAnimator.addUpdateListener {
+            val value = it.animatedValue as Int
+            params.width = value
+            textViewToAnimate.layoutParams = params
+        }
+
+        // Height Animator
+        val heightAnimator = ValueAnimator.ofInt(textEntryEditText.height, rightTextView.height)
+        heightAnimator.addUpdateListener {
+            val value = it.animatedValue as Int
+            params.height = value
+            textViewToAnimate.layoutParams = params
+        }
+
+        // Color Animator
+        val colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), Color.WHITE, getThemePrimaryColor(mainActivity))
+        colorAnimator.addUpdateListener {
+            val value = it.animatedValue as Int
+            val layerDrawable = textViewToAnimate.background as LayerDrawable
+            val gradientDrawable = layerDrawable.findDrawableByLayerId(R.id.bubble_white_main) as GradientDrawable
+            val tailDrawable = layerDrawable.findDrawableByLayerId(R.id.bubble_white_main_tail) as VectorDrawable
+
+            gradientDrawable.colors = intArrayOf(value, value)
+            tailDrawable.setColorFilter(value, PorterDuff.Mode.SRC_ATOP)
+
+            layerDrawable.setDrawableByLayerId(R.id.bubble_white_main, gradientDrawable)
+            layerDrawable.setDrawableByLayerId(R.id.bubble_white_main_tail, tailDrawable)
+
+            textViewToAnimate.background = layerDrawable
+        }
+
+        // Path Animator Listener - OnEnd remove the view to reveal the actual item in the recycler view
+        pathAnimator.addListener(object: Animator.AnimatorListener {
+            override fun onAnimationEnd(animation: Animator?) {
+                rightTextView.alpha = 1f
+                Operations.changeAlphaOnMessageOnCurrentThread((dataForAdapter.last() as Message).id!!, 1f)
+                baseChat.removeView(textViewToAnimate)
+                textEntryEditText.isEnabled = true
+                sendButton.isEnabled = true
+            }
+            override fun onAnimationCancel(animation: Animator?) {}
+            override fun onAnimationStart(animation: Animator?) {}
+            override fun onAnimationRepeat(animation: Animator?) {}
+        })
+
+        // Play all animations together
+        val animatorSet = AnimatorSet()
+        animatorSet.playTogether(pathAnimator, widthAnimator, heightAnimator, colorAnimator)
+        animatorSet.start()
+    }
+
+    private fun getPathWithArc(endCoordIntArray: IntArray, coordArray: IntArray): Path {
+        return Path().apply {
             val displayMetrics = DisplayMetrics()
             mainActivity.windowManager.defaultDisplay.getMetrics(displayMetrics)
             val height = displayMetrics.heightPixels
@@ -456,75 +532,30 @@ class ChatFragment: Fragment() {
 
             moveTo(x0, y0)
 
-            // x1, y1 curve from first point - calculate by finding the line from x0,y0 to the bottom|right of the screen and divide by 3
-            val xy1Array = GeoHelper.findPointInLine(x0, y0, endOfScreenX.toFloat(), endOfScreenY.toFloat(), 2.2f)
+            // x1, y1 curve from first point - calculate by finding the line from x0,y0 to the bottom|right of the screen and divide by 2.2
+            val xy1Array = ScreenSizeHelper.findPointInLine(
+                x0,
+                y0,
+                endOfScreenX.toFloat(),
+                endOfScreenY.toFloat(),
+                2.2f
+            )
             val x1 = xy1Array[0]
             val y1 = xy1Array[1]
-            // x2, y2 curve from last point - calculate by finding the line from  x4,y4 to the bottom|right of the screen and divide by 3
-            val xy2Array = GeoHelper.findPointInLine(x3, y3, endOfScreenX.toFloat(), endOfScreenY.toFloat(), 2.3f)
+            // x2, y2 curve from last point - calculate by finding the line from  x4,y4 to the bottom|right of the screen and divide by 2.1
+            val xy2Array = ScreenSizeHelper.findPointInLine(
+                x3,
+                y3,
+                endOfScreenX.toFloat(),
+                endOfScreenY.toFloat(),
+                2.1f
+            )
             val x2 = xy2Array[0]
             val y2 = xy2Array[1]
-
-            Log.d(TAG, "createTextViewToAnimate: x0 = $x0, y0 = $y0, x1 = $x1, y1 = $y1, x2 = $x2, y2 = $y2, x3 = $x3, y3 = $y3")
 
             cubicTo(x1.toFloat(), y1.toFloat(), x2.toFloat(), y2.toFloat(), x3, y3)
 
         }
-
-        val animation = ObjectAnimator.ofFloat(textViewToAnimate, View.X, View.Y, path)
-
-
-        val params = textViewToAnimate.layoutParams
-
-        val rightTextView = (recyclerView.layoutManager?.findViewByPosition(dataForAdapter.size - 1) as RelativeLayout).findViewById<TextView>(R.id.rightTextView)
-        val widthAnimator = ValueAnimator.ofInt(textEntryEditText.width, rightTextView!!.width)
-        widthAnimator.addUpdateListener {
-            val value = it.animatedValue as Int
-            params.width = value
-            textViewToAnimate.layoutParams = params
-        }
-
-
-        val heightAnimator = ValueAnimator.ofInt(textEntryEditText.height, rightTextView.height)
-        heightAnimator.addUpdateListener {
-            val value = it.animatedValue as Int
-            params.height = value
-            textViewToAnimate.layoutParams = params
-        }
-
-        val colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), Color.WHITE, getThemePrimaryColor(mainActivity))
-        colorAnimator.addUpdateListener {
-            val value = it.animatedValue as Int
-            val sDrawable = textViewToAnimate.background as LayerDrawable
-            val layerShapeDrawable = sDrawable.findDrawableByLayerId(R.id.bubble_white_main) as GradientDrawable
-            val tailDrawable = sDrawable.findDrawableByLayerId(R.id.bubble_white_main_tail) as VectorDrawable
-
-            layerShapeDrawable.colors = intArrayOf(value, value)
-            tailDrawable.setColorFilter(value, PorterDuff.Mode.SRC_ATOP)
-
-            sDrawable.setDrawableByLayerId(R.id.bubble_white_main, layerShapeDrawable)
-            sDrawable.setDrawableByLayerId(R.id.bubble_white_main_tail, tailDrawable)
-
-            textViewToAnimate.background = sDrawable
-        }
-
-        animation.addListener(object: Animator.AnimatorListener {
-            override fun onAnimationEnd(animation: Animator?) {
-                rightTextView.alpha = 1f
-                RealmOperations.changeAlphaOnMessageOnUI((dataForAdapter.last() as Message).id!!, 1f)
-                baseChat.removeView(textViewToAnimate)
-                textEntryEditText.isEnabled = true
-                sendButton.isEnabled = true
-            }
-            override fun onAnimationCancel(animation: Animator?) {}
-            override fun onAnimationStart(animation: Animator?) {}
-            override fun onAnimationRepeat(animation: Animator?) {}
-        })
-
-        val animatorSet = AnimatorSet()
-        //animatorSet.duration = 250
-        animatorSet.playTogether(animation, widthAnimator, heightAnimator, colorAnimator)
-        animatorSet.start()
     }
 
     override fun onDestroy() {
